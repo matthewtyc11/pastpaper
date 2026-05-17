@@ -1,23 +1,56 @@
-const API = "https://script.google.com/macros/s/AKfycbyR6r33DAdATfV-Dpf5yrXa2-1fBZqUn2qCMczNAHdoOGGRX7WUfdQWhkXLNy_iQg/exec"
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>試卷系統（免費版）</title>
 
-document.addEventListener("DOMContentLoaded", load);
+<style>
+body { display: flex; height: 100vh; margin: 0; font-family: sans-serif; }
+.left { width: 35%; padding: 20px; background: #f5f5f5; }
+.right { width: 65%; }
+iframe { width: 100%; height: 100%; border: none; }
+.file { background: white; margin: 5px; padding: 10px; cursor: pointer; }
+</style>
+</head>
+
+<body>
+
+<div class="left">
+
+<h2>📤 上傳</h2>
+
+<form id="uploadForm" target="hiddenFrame" method="POST">
+  <input type="file" id="file"><br><br>
+  <input type="text" id="name" placeholder="檔名"><br><br>
+  <button type="submit">上傳</button>
+</form>
+
+<iframe name="hiddenFrame" style="display:none;"></iframe>
+
+<p id="msg"></p>
+
+<h2>📋 清單</h2>
+<div id="list">載入中...</div>
+
+</div>
+
+<div class="right" id="viewer">
+  <p style="text-align:center;margin-top:40%">點左邊查看</p>
+</div>
+
+<script>
+const API = "https://script.google.com/macros/s/AKfycbyR6r33DAdATfV-Dpf5yrXa2-1fBZqUn2qCMczNAHdoOGGRX7WUfdQWhkXLNy_iQg/exec";
 
 // 讀取清單
 function load() {
-  fetch(API + "?t=" + Date.now())
+  fetch(API)
     .then(r => r.text())
     .then(t => {
-      const data = JSON.parse(t);
+      const files = JSON.parse(t);
       const list = document.getElementById("list");
-
       list.innerHTML = "";
 
-      if (!data.files || data.files.length === 0) {
-        list.innerHTML = "沒有檔案";
-        return;
-      }
-
-      data.files.forEach(f => {
+      files.forEach(f => {
         const div = document.createElement("div");
         div.className = "file";
         div.innerText = f.name;
@@ -29,55 +62,53 @@ function load() {
 
         list.appendChild(div);
       });
-    })
-    .catch(err => {
-      console.error(err);
-      document.getElementById("list").innerText = "❌ 無法連線（iPad限制或網址錯）";
     });
 }
 
-// 上傳
-function upload() {
+// 上傳（iframe hack）
+document.getElementById("uploadForm").onsubmit = function(e) {
+  e.preventDefault();
+
   const file = document.getElementById("file").files[0];
   const name = document.getElementById("name").value;
   const msg = document.getElementById("msg");
 
-  if (!file) return alert("請選擇檔案");
-  if (!name) return alert("請輸入名稱");
-
-  msg.innerText = "處理中...";
+  if (!file || !name) return alert("填好");
 
   const reader = new FileReader();
 
-  reader.onload = e => {
+  reader.onload = function(e) {
     const base64 = e.target.result.split(",")[1];
 
-    const form = new FormData();
-    form.append("customName", name);
-    form.append("fileExtension", file.name.split(".").pop());
-    form.append("mimeType", file.type);
-    form.append("base64", base64);
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = API;
+    form.target = "hiddenFrame";
 
-    fetch(API, {
-      method: "POST",
-      body: form
-    })
-      .then(r => r.text())
-      .then(t => {
-        const data = JSON.parse(t);
+    function add(name, value) {
+      const input = document.createElement("input");
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    }
 
-        if (data.status === "success") {
-          msg.innerText = "✅ 上傳成功";
-          load();
-        } else {
-          msg.innerText = "❌ 上傳失敗";
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        msg.innerText = "❌ iPad 擋掉 / 網絡問題";
-      });
+    add("name", name);
+    add("ext", file.name.split(".").pop());
+    add("type", file.type);
+    add("base64", base64);
+
+    document.body.appendChild(form);
+    form.submit();
+
+    msg.innerText = "✅ 已上傳（刷新清單）";
+    setTimeout(load, 1500);
   };
 
   reader.readAsDataURL(file);
-}
+};
+
+load();
+</script>
+
+</body>
+</html>

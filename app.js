@@ -1,5 +1,5 @@
 // ⚠️ 請替換成你在 Google Apps Script 部署後取得的 Web App 網址
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzwzPzfCMpsgLnOe5YUOjrkUVGvnMWTW0s0ws48dl00cN-mWntinb9HINvrQxW2EU0mXA/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyR6r33DAdATfV-Dpf5yrXa2-1fBZqUn2qCMczNAHdoOGGRX7WUfdQWhkXLNy_iQg/exec";
 
 // 網頁一打開，立刻自動載入所有歷史檔案列表
 document.addEventListener("DOMContentLoaded", loadFileList);

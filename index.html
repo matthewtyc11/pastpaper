@@ -2,14 +2,21 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<title>試卷系統（免費版）</title>
+<title>免費試卷系統</title>
 
 <style>
 body { display: flex; height: 100vh; margin: 0; font-family: sans-serif; }
-.left { width: 35%; padding: 20px; background: #f5f5f5; }
+.left { width: 35%; padding: 20px; background: #f5f5f5; overflow-y:auto; }
 .right { width: 65%; }
 iframe { width: 100%; height: 100%; border: none; }
-.file { background: white; margin: 5px; padding: 10px; cursor: pointer; }
+
+.file {
+  background: white;
+  margin: 5px 0;
+  padding: 10px;
+  cursor: pointer;
+  border-left: 5px solid blue;
+}
 </style>
 </head>
 
@@ -19,13 +26,9 @@ iframe { width: 100%; height: 100%; border: none; }
 
 <h2>📤 上傳</h2>
 
-<form id="uploadForm" target="hiddenFrame" method="POST">
-  <input type="file" id="file"><br><br>
-  <input type="text" id="name" placeholder="檔名"><br><br>
-  <button type="submit">上傳</button>
-</form>
-
-<iframe name="hiddenFrame" style="display:none;"></iframe>
+<input type="file" id="file"><br><br>
+<input type="text" id="name" placeholder="檔名"><br><br>
+<button onclick="upload()">上傳</button>
 
 <p id="msg"></p>
 
@@ -43,12 +46,17 @@ const API = "https://script.google.com/macros/s/AKfycbyR6r33DAdATfV-Dpf5yrXa2-1f
 
 // 讀取清單
 function load() {
-  fetch(API)
+  fetch(API + "?t=" + Date.now())
     .then(r => r.text())
     .then(t => {
       const files = JSON.parse(t);
       const list = document.getElementById("list");
       list.innerHTML = "";
+
+      if (files.length === 0) {
+        list.innerHTML = "沒有檔案";
+        return;
+      }
 
       files.forEach(f => {
         const div = document.createElement("div");
@@ -62,18 +70,22 @@ function load() {
 
         list.appendChild(div);
       });
+    })
+    .catch(() => {
+      document.getElementById("list").innerText = "載入失敗";
     });
 }
 
-// 上傳（iframe hack）
-document.getElementById("uploadForm").onsubmit = function(e) {
-  e.preventDefault();
-
+// 上傳（最穩定）
+function upload() {
   const file = document.getElementById("file").files[0];
   const name = document.getElementById("name").value;
   const msg = document.getElementById("msg");
 
-  if (!file || !name) return alert("填好");
+  if (!file) return alert("請選檔案");
+  if (!name) return alert("請輸入名稱");
+
+  msg.innerText = "處理中...";
 
   const reader = new FileReader();
 
@@ -85,10 +97,10 @@ document.getElementById("uploadForm").onsubmit = function(e) {
     form.action = API;
     form.target = "hiddenFrame";
 
-    function add(name, value) {
+    function add(n, v) {
       const input = document.createElement("input");
-      input.name = name;
-      input.value = value;
+      input.name = n;
+      input.value = v;
       form.appendChild(input);
     }
 
@@ -100,15 +112,17 @@ document.getElementById("uploadForm").onsubmit = function(e) {
     document.body.appendChild(form);
     form.submit();
 
-    msg.innerText = "✅ 已上傳（刷新清單）";
+    msg.innerText = "✅ 上傳成功（1秒後刷新）";
     setTimeout(load, 1500);
   };
 
   reader.readAsDataURL(file);
-};
+}
 
 load();
 </script>
+
+<iframe name="hiddenFrame" style="display:none;"></iframe>
 
 </body>
 </html>

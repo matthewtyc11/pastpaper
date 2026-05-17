@@ -2,66 +2,185 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<title>免費試卷系統</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>試卷共享平台</title>
 
 <style>
-body { display: flex; height: 100vh; margin: 0; font-family: sans-serif; }
-.left { width: 35%; padding: 20px; background: #f5f5f5; overflow-y:auto; }
-.right { width: 65%; }
-iframe { width: 100%; height: 100%; border: none; }
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f0f2f5;
+  display: flex;
+  height: 100vh;
+}
+
+/* 左側 */
+.sidebar {
+  width: 360px;
+  background: white;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+}
+
+/* 標題 */
+.title {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+/* 卡片 */
+.card {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+/* input */
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+/* button */
+button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  background: #007bff;
+  border: none;
+  color: white;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #0056b3;
+}
+
+/* 清單 */
+.file-list {
+  flex: 1;
+  overflow-y: auto;
+}
 
 .file {
   background: white;
-  margin: 5px 0;
-  padding: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
   cursor: pointer;
-  border-left: 5px solid blue;
+  border-left: 4px solid #007bff;
+  transition: 0.2s;
+}
+
+.file:hover {
+  transform: translateX(4px);
+  background: #eef3ff;
+}
+
+/* 右側 */
+.viewer {
+  flex: 1;
+  background: #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* 空畫面 */
+.placeholder {
+  color: #666;
+  font-size: 18px;
+}
+
+/* 手機 */
+@media (max-width: 768px) {
+  body {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    height: 45%;
+  }
+  .viewer {
+    height: 55%;
+  }
 }
 </style>
 </head>
 
 <body>
 
-<div class="left">
+<!-- 左 -->
+<div class="sidebar">
 
-<h2>📤 上傳</h2>
+  <div class="title">📚 試卷共享平台</div>
 
-<input type="file" id="file"><br><br>
-<input type="text" id="name" placeholder="檔名"><br><br>
-<button onclick="upload()">上傳</button>
+  <!-- 上傳 -->
+  <div class="card">
+    <b>📤 上傳試卷</b>
 
-<p id="msg"></p>
+    <input type="file" id="file">
+    <input type="text" id="name" placeholder="輸入檔案名稱">
 
-<h2>📋 清單</h2>
-<div id="list">載入中...</div>
+    <button onclick="upload()">上傳</button>
+
+    <p id="msg"></p>
+  </div>
+
+  <!-- 清單 -->
+  <div class="file-list" id="list">
+    載入中...
+  </div>
 
 </div>
 
-<div class="right" id="viewer">
-  <p style="text-align:center;margin-top:40%">點左邊查看</p>
+<!-- 右 -->
+<div class="viewer" id="viewer">
+  <div class="placeholder">👈 點左邊檔案查看</div>
 </div>
+
+<iframe name="hiddenFrame" style="display:none;"></iframe>
 
 <script>
-const API = "https://script.google.com/macros/s/AKfycbyR6r33DAdATfV-Dpf5yrXa2-1fBZqUn2qCMczNAHdoOGGRX7WUfdQWhkXLNy_iQg/exec";
+const API = "https://script.google.com/macros/s/AKfycbyR6r33DAdATfV-Dpf5yrXa2-1fBZqUn2qCMczNAHdoOGGRX7WUfdQWhkXLNy_iQg/exec"
 
-// 讀取清單
+/* 載入清單 */
 function load() {
   fetch(API + "?t=" + Date.now())
     .then(r => r.text())
     .then(t => {
       const files = JSON.parse(t);
       const list = document.getElementById("list");
+
       list.innerHTML = "";
 
       if (files.length === 0) {
-        list.innerHTML = "沒有檔案";
+        list.innerHTML = "📭 暫時沒有檔案";
         return;
       }
 
       files.forEach(f => {
         const div = document.createElement("div");
         div.className = "file";
-        div.innerText = f.name;
+        div.innerHTML = `📄 ${f.name}`;
 
         div.onclick = () => {
           document.getElementById("viewer").innerHTML =
@@ -72,11 +191,11 @@ function load() {
       });
     })
     .catch(() => {
-      document.getElementById("list").innerText = "載入失敗";
+      document.getElementById("list").innerText = "❌ 載入失敗";
     });
 }
 
-// 上傳（最穩定）
+/* 上傳 */
 function upload() {
   const file = document.getElementById("file").files[0];
   const name = document.getElementById("name").value;
@@ -112,7 +231,7 @@ function upload() {
     document.body.appendChild(form);
     form.submit();
 
-    msg.innerText = "✅ 上傳成功（1秒後刷新）";
+    msg.innerText = "✅ 上傳成功";
     setTimeout(load, 1500);
   };
 
@@ -121,8 +240,6 @@ function upload() {
 
 load();
 </script>
-
-<iframe name="hiddenFrame" style="display:none;"></iframe>
 
 </body>
 </html>

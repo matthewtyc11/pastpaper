@@ -1,151 +1,247 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>校園歷屆試題分享庫</title>
+  <title>School Past Paper Share Library</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; }
     h1, h2 { color: #333; }
     .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
-    button { background-color: #007bff; color: white; border: none; cursor: pointer; font-size: 16px; }
+    input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+    button { background-color: #007bff; color: white; border: none; cursor: pointer; font-size: 16px; font-weight: bold; }
     button:hover { background-color: #0056b3; }
+    .filter-group { display: flex; gap: 10px; margin-bottom: 10px; }
     .paper-item { border-bottom: 1px solid #eee; padding: 15px 0; display: flex; justify-content: space-between; align-items: center; }
     .paper-item:last-child { border-bottom: none; }
-    .download-btn { background-color: #28a745; color: white; padding: 5px 15px; text-decoration: none; border-radius: 4px; font-size: 14px; }
+    .paper-info { line-height: 1.5; }
+    .meta-text { font-size: 12px; color: #666; }
+    .download-btn { background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: bold; }
     .download-btn:hover { background-color: #218838; }
+    .hidden-input { display: none; background-color: #fff9e6; border: 1px solid #ffcc00; }
   </style>
 </head>
 <body>
 
-  <h1>📚 校園歷屆試題分享庫</h1>
-  <p>歡迎各位同學上傳與搜尋考卷，上傳後需等待管理員審核才會公開顯示。</p>
+  <h1>📚 School Past Paper Share Library</h1>
+  <p>Welcome! You can upload or search papers here. Uploaded papers require admin approval before becoming public.</p>
 
   <div class="section">
-    <h2>📤 上傳新考卷</h2>
+    <h2>📤 Upload New Paper</h2>
     <form id="uploadForm">
-      <input type="text" id="uploadSubject" placeholder="輸入科目名稱 (例如：數學、英文)" required>
-      <input type="number" id="uploadYear" placeholder="輸入考卷年份 (例如：2025)" required>
-      <input type="file" id="uploadFile" accept=".pdf,.doc,.docx,.png,.jpg" required>
-      <button type="submit" id="submitBtn">提交考卷 (等待審核)</button>
+      <label>Subject:</label>
+      <select id="uploadSubject" onchange="toggleOtherInput('uploadSubject', 'uploadOtherSubject')" required>
+        <option value="Maths">Maths</option>
+        <option value="English">English</option>
+        <option value="Chinese">Chinese</option>
+        <option value="Science">Science</option>
+        <option value="Physics">Physics</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Biology">Biology</option>
+        <option value="History">History</option>
+        <option value="Geography">Geography</option>
+        <option value="Other">Other (Type below...)</option>
+      </select>
+      
+      <input type="text" id="uploadOtherSubject" class="hidden-input" placeholder="Please specify your subject name here...">
+
+      <label>Term:</label>
+      <select id="uploadTerm" required>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+      </select>
+
+      <label>Year:</label>
+      <select id="uploadYear" required></select>
+
+      <label>Uploader Name (Optional, will show 'Anonymous' if left blank):</label>
+      <input type="text" id="uploadUploader" placeholder="Enter your name or nickname">
+
+      <label>Select File (PDF or Image):</label>
+      <input type="file" id="uploadFile" accept=".pdf,.png,.jpg,.jpeg" required>
+      
+      <button type="submit" id="submitBtn">Submit Paper (Pending Approval)</button>
     </form>
   </div>
 
   <div class="section">
-    <h2>🔍 搜尋歷屆試題</h2>
-    <input type="text" id="searchBar" placeholder="輸入科目關鍵字搜尋..." oninput="fetchPapers()">
+    <h2>🔍 Search Past Papers</h2>
+    <div class="filter-group">
+      <select id="searchSubject" onchange="fetchPapers()">
+        <option value="">All Subjects</option>
+        <option value="Maths">Maths</option>
+        <option value="English">English</option>
+        <option value="Chinese">Chinese</option>
+        <option value="Science">Science</option>
+        <option value="Physics">Physics</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Biology">Biology</option>
+        <option value="History">History</option>
+        <option value="Geography">Geography</option>
+        </select>
+
+      <select id="searchTerm" onchange="fetchPapers()">
+        <option value="">All Terms</option>
+        <option value="1">Term 1</option>
+        <option value="2">Term 2</option>
+        <option value="3">Term 3</option>
+      </select>
+
+      <select id="searchYear" onchange="fetchPapers()">
+        <option value="">All Years</option>
+      </select>
+    </div>
     
     <div id="papersList">
-      <p style="color: #666;">載入中或查無資料...</p>
+      <p style="color: #666;">Loading or no data found...</p>
     </div>
   </div>
 
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-    // ✨ 這裡已經幫你把 /rest/v1/ 拿掉了！
     const SUPABASE_URL = 'https://lltyalimcdwsmkvocnvp.supabase.co'
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsdHlhbGltY2R3c21rdm9jbnZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjY5NjksImV4cCI6MjA5NDYwMjk2OX0.3MBcS3chUFQXm8PX0rYDiVY98oXaSu3uqGY-Qzm8qIU'
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-    // 網頁開啟時自動載入
+    // Generate years dynamically
     window.addEventListener('DOMContentLoaded', () => {
+      const upYearSelect = document.getElementById('uploadYear')
+      const seYearSelect = document.getElementById('searchYear')
+      for (let y = 2026; y >= 2020; y--) {
+        upYearSelect.innerHTML += `<option value="${y}">${y}</option>`
+        seYearSelect.innerHTML += `<option value="${y}">${y}</option>`
+      }
       fetchPapers()
     })
 
-    // 1. 搜尋與讀取
+    // Show/Hide Other Input field
+    function toggleOtherInput(selectId, inputId) {
+      const selectEl = document.getElementById(selectId)
+      const inputEl = document.getElementById(inputId)
+      if (selectEl.value === 'Other') {
+        inputEl.style.display = 'block'
+        inputEl.required = true
+      } else {
+        inputEl.style.display = 'none'
+        inputEl.required = false
+      }
+    }
+    window.toggleOtherInput = toggleOtherInput
+
+    // Fetch and Filter Data
     async function fetchPapers() {
-      const keyword = document.getElementById('searchBar').value
+      const sub = document.getElementById('searchSubject').value
+      const term = document.getElementById('searchTerm').value
+      const year = document.getElementById('searchYear').value
       const listDiv = document.getElementById('papersList')
       
-      let query = supabase.from('past_papers').select('*')
+      let query = supabase.from('past_papers').select('*').eq('approved', true)
       
-      if (keyword) {
-        query = query.ilike('subject', `%${keyword}%`)
-      }
+      if (sub) query = query.eq('subject', sub)
+      if (term) query = query.eq('term', term)
+      if (year) query = query.eq('year', parseInt(year))
+
+      query = query.order('created_at', { ascending: false })
 
       const { data: papers, error } = await query
 
       if (error) {
-        listDiv.innerHTML = `<p style="color:red;">讀取失敗：${error.message}</p>`
+        listDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`
         return
       }
 
       if (papers.length === 0) {
-        listDiv.innerHTML = '<p style="color:#999;">目前沒有已審核的考卷。</p>'
+        listDiv.innerHTML = '<p style="color:#999;">No approved papers match these filters.</p>'
         return
       }
 
       listDiv.innerHTML = ''
       papers.forEach(paper => {
+        const date = new Date(paper.created_at).toLocaleDateString('en-US')
         listDiv.innerHTML += `
           <div class="paper-item">
-            <div>
-              <strong>[${paper.year} 年]</strong> ${paper.subject}
+            <div class="paper-info">
+              <strong>[Year ${paper.year} - Term ${paper.term}]</strong> ${paper.subject}<br>
+              <span class="meta-text">Contributed by: ${paper.uploader} | Date: ${date}</span>
             </div>
-            <a class="download-btn" href="${paper.file_url}" target="_blank">下載 / 線上查看</a>
+            <a class="download-btn" href="${paper.file_url}" target="_blank">View / Download</a>
           </div>
         `
       })
     }
     window.fetchPapers = fetchPapers
 
-    // 2. 處理同學上傳
+    // Form Submit (Upload)
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault()
       const submitBtn = document.getElementById('submitBtn')
       
-      const subject = document.getElementById('uploadSubject').value.trim()
+      let subject = document.getElementById('uploadSubject').value
+      if (subject === 'Other') {
+        subject = document.getElementById('uploadOtherSubject').value.trim()
+        if(!subject) {
+          alert('Please enter your custom subject name.')
+          return
+        }
+      }
+      
+      const term = document.getElementById('uploadTerm').value
       const year = document.getElementById('uploadYear').value
+      let uploader = document.getElementById('uploadUploader').value.trim()
       const file = document.getElementById('uploadFile').files[0]
 
+      if (!uploader) uploader = 'Anonymous'
       if (!file) return
 
       submitBtn.disabled = true
-      submitBtn.innerText = '上傳中，請稍候...'
+      submitBtn.innerText = 'Uploading file, please wait...'
 
       const fileExt = file.name.split('.').pop()
-      const cleanFileName = `${subject}_${year}_${Date.now()}.${fileExt}`
+      const cleanFileName = `${subject.replace(/[^a-zA-Z0-9]/g, "_")}_Term${term}_${year}_${Date.now()}.${fileExt}`
 
-      // A. 上傳到 Storage
-      const { data: storageData, error: storageError } = await supabase.storage
+      // A. Upload to Storage Bucket
+      const { error: storageError } = await supabase.storage
         .from('papers-bucket')
         .upload(`uploads/${cleanFileName}`, file)
 
       if (storageError) {
-        alert('檔案上傳失敗：' + storageError.message)
+        alert('Storage upload failed: ' + storageError.message)
         submitBtn.disabled = false
-        submitBtn.innerText = '提交考卷 (等待審核)'
+        submitBtn.innerText = 'Submit Paper (Pending Approval)'
         return
       }
 
-      // B. 拿取公開下載網址
+      // B. Get Public URL
       const { data: urlData } = supabase.storage
         .from('papers-bucket')
         .getPublicUrl(`uploads/${cleanFileName}`)
 
-      // C. 寫入資料表
+      // C. Insert into Database Table
       const { error: dbError } = await supabase
         .from('past_papers')
         .insert([
           {
             subject: subject,
             year: parseInt(year),
+            term: term,
+            uploader: uploader,
             file_name: cleanFileName,
             file_url: urlData.publicUrl
           }
         ])
 
       if (dbError) {
-        alert('資料庫紀錄失敗：' + dbError.message)
+        alert('Database log failed: ' + dbError.message)
       } else {
-        alert('🎉 上傳成功！請靜待管理員審核通過。')
+        alert('🎉 Upload success! Thank you for contributing. Waiting for admin review.')
         document.getElementById('uploadForm').reset()
+        document.getElementById('uploadOtherSubject').style.display = 'none'
       }
 
       submitBtn.disabled = false
-      submitBtn.innerText = '提交考卷 (等待審核)'
+      submitBtn.innerText = 'Submit Paper (Pending Approval)'
     })
   </script>
 </body>

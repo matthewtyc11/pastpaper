@@ -19,15 +19,16 @@
     .download-btn { background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: bold; }
     .download-btn:hover { background-color: #218838; }
     .hidden-input { display: none; background-color: #fff9e6; border: 1px solid #ffcc00; }
+    label { font-weight: bold; color: #555; display: block; margin-top: 8px; }
   </style>
 </head>
 <body>
 
   <h1>📚 School Past Paper Share Library</h1>
-  <p>Welcome! You can upload or search papers here. Uploaded papers require admin approval before becoming public.</p>
+  <p>Search standard papers or upload your own to contribute. All uploads go through admin vetting before public release.</p>
 
   <div class="section">
-    <h2>📤 Upload New Paper</h2>
+    <h2>📤 Upload New Test Paper</h2>
     <form id="uploadForm">
       <label>Subject:</label>
       <select id="uploadSubject" onchange="toggleOtherInput('uploadSubject', 'uploadOtherSubject')" required>
@@ -40,10 +41,12 @@
         <option value="Biology">Biology</option>
         <option value="History">History</option>
         <option value="Geography">Geography</option>
-        <option value="Other">Other (Type below...)</option>
+        <option value="Other">Other (Specify below...)</option>
       </select>
-      
-      <input type="text" id="uploadOtherSubject" class="hidden-input" placeholder="Please specify your subject name here...">
+      <input type="text" id="uploadOtherSubject" class="hidden-input" placeholder="Type custom subject name here...">
+
+      <label>Exam / Paper Name:</label>
+      <input type="text" id="uploadPaperName" placeholder="e.g., Midterm Exam, Final Quiz, Mock Test 2" required>
 
       <label>Term:</label>
       <select id="uploadTerm" required>
@@ -55,18 +58,20 @@
       <label>Year:</label>
       <select id="uploadYear" required></select>
 
-      <label>Uploader Name (Optional, will show 'Anonymous' if left blank):</label>
-      <input type="text" id="uploadUploader" placeholder="Enter your name or nickname">
+      <label>Uploader Profile Identity (Optional):</label>
+      <input type="text" id="uploadUploader" placeholder="Your name or nickname (Defaults to 'Anonymous')">
 
-      <label>Select File (PDF or Image):</label>
+      <label>Attach Exam Document (PDF or Images):</label>
       <input type="file" id="uploadFile" accept=".pdf,.png,.jpg,.jpeg" required>
       
-      <button type="submit" id="submitBtn">Submit Paper (Pending Approval)</button>
+      <button type="submit" id="submitBtn">Submit Asset into Review Queue</button>
     </form>
   </div>
 
   <div class="section">
-    <h2>🔍 Search Past Papers</h2>
+    <h2>🔍 Hybrid Search Multi-Filter</h2>
+    <input type="text" id="searchKeyword" placeholder="Type keywords to filter by Test Name or Uploader..." oninput="fetchPapers()">
+    
     <div class="filter-group">
       <select id="searchSubject" onchange="fetchPapers()">
         <option value="">All Subjects</option>
@@ -79,7 +84,7 @@
         <option value="Biology">Biology</option>
         <option value="History">History</option>
         <option value="Geography">Geography</option>
-        </select>
+      </select>
 
       <select id="searchTerm" onchange="fetchPapers()">
         <option value="">All Terms</option>
@@ -94,7 +99,7 @@
     </div>
     
     <div id="papersList">
-      <p style="color: #666;">Loading or no data found...</p>
+      <p style="color: #666;">Querying database records...</p>
     </div>
   </div>
 
@@ -105,7 +110,6 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsdHlhbGltY2R3c21rdm9jbnZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjY5NjksImV4cCI6MjA5NDYwMjk2OX0.3MBcS3chUFQXm8PX0rYDiVY98oXaSu3uqGY-Qzm8qIU'
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-    // Generate years dynamically
     window.addEventListener('DOMContentLoaded', () => {
       const upYearSelect = document.getElementById('uploadYear')
       const seYearSelect = document.getElementById('searchYear')
@@ -116,22 +120,20 @@
       fetchPapers()
     })
 
-    // Show/Hide Other Input field
     function toggleOtherInput(selectId, inputId) {
       const selectEl = document.getElementById(selectId)
       const inputEl = document.getElementById(inputId)
       if (selectEl.value === 'Other') {
-        inputEl.style.display = 'block'
-        inputEl.required = true
+        inputEl.style.display = 'block'; inputEl.required = true;
       } else {
-        inputEl.style.display = 'none'
-        inputEl.required = false
+        inputEl.style.display = 'none'; inputEl.required = false;
       }
     }
     window.toggleOtherInput = toggleOtherInput
 
-    // Fetch and Filter Data
+    // 🚀 終極文字+下拉選單混合大搜尋
     async function fetchPapers() {
+      const keyword = document.getElementById('searchKeyword').value.trim()
       const sub = document.getElementById('searchSubject').value
       const term = document.getElementById('searchTerm').value
       const year = document.getElementById('searchYear').value
@@ -143,17 +145,21 @@
       if (term) query = query.eq('term', term)
       if (year) query = query.eq('year', parseInt(year))
 
-      query = query.order('created_at', { ascending: false })
+      // 如果有輸入文字關鍵字，同時模糊比對考卷名稱與上傳者
+      if (keyword) {
+        query = query.or(`paper_name.ilike.%${keyword}%,uploader.ilike.%${keyword}%`)
+      }
 
+      query = query.order('created_at', { ascending: false })
       const { data: papers, error } = await query
 
       if (error) {
-        listDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`
+        listDiv.innerHTML = `<p style="color:red;">Query error: ${error.message}</p>`
         return
       }
 
       if (papers.length === 0) {
-        listDiv.innerHTML = '<p style="color:#999;">No approved papers match these filters.</p>'
+        listDiv.innerHTML = '<p style="color:#999;">No approved files match your filter combination.</p>'
         return
       }
 
@@ -163,17 +169,18 @@
         listDiv.innerHTML += `
           <div class="paper-item">
             <div class="paper-info">
-              <strong>[Year ${paper.year} - Term ${paper.term}]</strong> ${paper.subject}<br>
-              <span class="meta-text">Contributed by: ${paper.uploader} | Date: ${date}</span>
+              <span style="font-size:16px; font-weight:bold; color:#0056b3;">${paper.paper_name}</span><br>
+              <strong>[Year ${paper.year} - Term ${paper.term}]</strong> Subject: ${paper.subject}<br>
+              <span class="meta-text">By: ${paper.uploader} | Released: ${date}</span>
             </div>
-            <a class="download-btn" href="${paper.file_url}" target="_blank">View / Download</a>
+            <a class="download-btn" href="${paper.file_url}" target="_blank">Download / Open</a>
           </div>
         `
       })
     }
     window.fetchPapers = fetchPapers
 
-    // Form Submit (Upload)
+    // 處理同學上傳
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault()
       const submitBtn = document.getElementById('submitBtn')
@@ -181,12 +188,10 @@
       let subject = document.getElementById('uploadSubject').value
       if (subject === 'Other') {
         subject = document.getElementById('uploadOtherSubject').value.trim()
-        if(!subject) {
-          alert('Please enter your custom subject name.')
-          return
-        }
+        if(!subject) { alert('Please insert your custom subject.'); return; }
       }
       
+      const paperName = document.getElementById('uploadPaperName').value.trim()
       const term = document.getElementById('uploadTerm').value
       const year = document.getElementById('uploadYear').value
       let uploader = document.getElementById('uploadUploader').value.trim()
@@ -195,35 +200,27 @@
       if (!uploader) uploader = 'Anonymous'
       if (!file) return
 
-      submitBtn.disabled = true
-      submitBtn.innerText = 'Uploading file, please wait...'
+      submitBtn.disabled = true; submitBtn.innerText = 'Uploading to secure node storage...'
 
       const fileExt = file.name.split('.').pop()
-      const cleanFileName = `${subject.replace(/[^a-zA-Z0-9]/g, "_")}_Term${term}_${year}_${Date.now()}.${fileExt}`
+      const cleanFileName = `${subject.replace(/[^a-zA-Z0-9]/g, "_")}_T${term}_${Date.now()}.${fileExt}`
 
-      // A. Upload to Storage Bucket
       const { error: storageError } = await supabase.storage
         .from('papers-bucket')
         .upload(`uploads/${cleanFileName}`, file)
 
       if (storageError) {
-        alert('Storage upload failed: ' + storageError.message)
-        submitBtn.disabled = false
-        submitBtn.innerText = 'Submit Paper (Pending Approval)'
-        return
+        alert('File payload upload aborted: ' + storageError.message); submitBtn.disabled = false; return;
       }
 
-      // B. Get Public URL
-      const { data: urlData } = supabase.storage
-        .from('papers-bucket')
-        .getPublicUrl(`uploads/${cleanFileName}`)
+      const { data: urlData } = supabase.storage.from('papers-bucket').getPublicUrl(`uploads/${cleanFileName}`)
 
-      // C. Insert into Database Table
       const { error: dbError } = await supabase
         .from('past_papers')
         .insert([
           {
             subject: subject,
+            paper_name: paperName,
             year: parseInt(year),
             term: term,
             uploader: uploader,
@@ -233,15 +230,13 @@
         ])
 
       if (dbError) {
-        alert('Database log failed: ' + dbError.message)
+        alert('Transaction insert failure: ' + dbError.message)
       } else {
-        alert('🎉 Upload success! Thank you for contributing. Waiting for admin review.')
+        alert('🎉 Uploaded successfully! Sent into verification queue.')
         document.getElementById('uploadForm').reset()
         document.getElementById('uploadOtherSubject').style.display = 'none'
       }
-
-      submitBtn.disabled = false
-      submitBtn.innerText = 'Submit Paper (Pending Approval)'
+      submitBtn.disabled = false; submitBtn.innerText = 'Submit Asset into Review Queue'
     })
   </script>
 </body>
